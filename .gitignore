@@ -1,3 +1,8 @@
+nvsn_production.db
+nvsn_memory_v2.json
+vector_store.json
+*.db
+*.sqlite
 __pycache__/
 *.pyc
 *.pyo
