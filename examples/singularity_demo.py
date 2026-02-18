@@ -58,7 +58,10 @@ async def main():
 
     try:
         # Simulate Tensor updates during execution
-        tensor_state.update(team_alpha.agents[0].id, load=0.9, health=0.5, memory=0.8) # Anomaly!
+        # Fix: team_alpha.agents is a dict {id: agent}, convert to list to index
+        first_agent = list(team_alpha.agents.values())[0]
+        tensor_state.update(first_agent.id, load=0.9, health=0.5, memory=0.8) # Anomaly!
+
         anomalies = tensor_state.detect_anomalies()
         if anomalies:
             logger.warning("Orchestrator detected anomalies via Tensor State", agents=anomalies)
