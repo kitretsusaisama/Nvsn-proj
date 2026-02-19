@@ -18,6 +18,12 @@ class PythonInterpreter(Tool):
             # Dangerous in real prod, use sandbox (e.g., e2b)
             # For this demo, we use a restricted exec with blocked access to unsafe modules
             # WARNING: This is still not fully secure for arbitrary code execution.
+            # In a real production deployment, this MUST be run inside a container or microVM.
+
+            # Simple guardrail for demo purposes
+            if "os.system" in code or "subprocess" in code or "import os" in code:
+                return "Security Violation: Unsafe modules detected."
+
             local_vars = {}
             # Minimal safety: empty builtins. In production, wrap this in Docker.
             exec(code, {"__builtins__": {}}, local_vars)
