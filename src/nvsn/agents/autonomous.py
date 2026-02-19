@@ -1,12 +1,11 @@
-import asyncio
 import structlog
-from typing import Dict, List, Any
-from ..core.types import Task, TaskResult, AgentState, AgentRole
+from sqlalchemy import select
+
 from ..agents.cognitive import CognitiveAgent
+from ..core.types import AgentRole, Task, TaskResult
 from ..infra.bus import bus
 from ..infra.database import db
 from ..infra.models import MemoryLogModel
-from sqlalchemy import select
 
 logger = structlog.get_logger()
 
@@ -19,7 +18,9 @@ class AutonomousAgent(CognitiveAgent):
     """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.logger = logger.bind(agent_id=self.id, role=self.role.value, type="Autonomous")
+        self.logger = logger.bind(
+            agent_id=self.id, role=self.role.value, type="Autonomous"
+        )
 
     async def _reflect_on_failures(self, task: Task) -> str:
         """
@@ -33,14 +34,16 @@ class AutonomousAgent(CognitiveAgent):
         async for session in db.get_session():
             result = await session.execute(
                 select(MemoryLogModel)
-                .where(MemoryLogModel.agent_id == self.role.value)
+                .where(
+                    MemoryLogModel.agent_id == self.role.value,
+                    MemoryLogModel.content.ilike("%error%")
+                )
                 .order_by(MemoryLogModel.timestamp.desc())
                 .limit(5)
             )
             logs = result.scalars().all()
             for log in logs:
-                if "error" in log.content.lower():
-                    reflections.append(f"- Previous Failure: {log.content}")
+                reflections.append(f"- Previous Failure: {log.content}")
 
         return "\n".join(reflections) if reflections else "No relevant failures found."
 
@@ -59,7 +62,9 @@ class AutonomousAgent(CognitiveAgent):
         reflection = await self._reflect_on_failures(task)
 
         # Modify context with reflection
-        task.description += f"\n\n[SELF-REFLECTION]\nAvoid these past mistakes:\n{reflection}"
+        task.description += (
+            f"\n\n[SELF-REFLECTION]\nAvoid these past mistakes:\n{reflection}"
+        )
 
         # Delegate to standard ReAct loop
         return await super().process_task(task)
