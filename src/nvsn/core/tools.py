@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Dict, Any, List
+from pathlib import Path
 
 class Tool(ABC):
     name: str
@@ -37,15 +38,38 @@ class FileSystem(Tool):
     name = "file_system"
     description = "Reads or writes files. Input: `operation` (read/write), `path`, `content`."
 
+    def __init__(self, base_path: str = "."):
+        self.base_path = Path(base_path).resolve()
+
     async def run(self, operation: str, path: str, content: str = None) -> str:
+        # Sanitize and validate path
+        try:
+            requested_path = Path(path)
+            # If path is absolute, we still want to ensure it's within base_path.
+            if requested_path.is_absolute():
+                target_path = requested_path.resolve()
+            else:
+                target_path = (self.base_path / requested_path).resolve()
+
+            if not target_path.is_relative_to(self.base_path):
+                return "Error: Path traversal detected. Access denied."
+        except Exception as e:
+            return f"Error resolving path: {str(e)}"
+
         if operation == "read":
             try:
-                with open(path, "r") as f:
+                with open(target_path, "r") as f:
                     return f.read()
             except FileNotFoundError:
                 return "File not found."
+            except Exception as e:
+                return f"Error reading file: {str(e)}"
         elif operation == "write":
-            with open(path, "w") as f:
-                f.write(content)
-            return "File written."
+            try:
+                target_path.parent.mkdir(parents=True, exist_ok=True)
+                with open(target_path, "w") as f:
+                    f.write(content)
+                return "File written."
+            except Exception as e:
+                return f"Error writing file: {str(e)}"
         return "Invalid operation."
